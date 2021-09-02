@@ -3,7 +3,7 @@ package crypto
 import (
 	// "crypto/aes"
 
-	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,12 +23,21 @@ func testAesGcm(t *testing.T, msg string) {
 	assert.Equal(t, plaintext, decrypttext)
 }
 
-func TestAesGcmFile(t *testing.T) {
+func TestAesGcmFileList(t *testing.T) {
+	testAesGcmFile(t, "plaintext.txt")
+	testAesGcmFile(t, "gradle-7.2-bin.zip")
+	// testAesGcmFile(t, "android-studio-2020.3.1.23-linux.tar.gz")
+}
+
+func testAesGcmFile(t *testing.T, inpath string) {
 	c, _ := newCipher()
-	inpath := "plaintext.txt"
+	// inpath := "plaintext.txt"
+	os.Remove(inpath + ".bin")
+	os.Remove(inpath + ".out")
 	outpath, _ := c.encryptFile(inpath)
 	plainpath, _ := c.decryptFile(outpath)
-	fmt.Println(plainpath)
-	// TODO
-	// assert.Equal(t, inpath, plainpath)
+	// fmt.Println(plainpath)
+	expected, _ := sha256File(inpath)
+	result, _ := sha256File(plainpath)
+	assert.Equal(t, expected, result)
 }

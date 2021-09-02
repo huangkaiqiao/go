@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -46,19 +47,8 @@ func newCipher() (Cipher, error) {
 }
 
 func (c *Cipher) encrypt(plaintext []byte) ([]byte, error) {
-	// Load your secret key from a safe place and reuse it across multiple
-	// Seal/Open calls. (Obviously don't use this example key for anything
-	// real.) If you want to convert a passphrase to a key, use a suitable
-	// package like bcrypt or scrypt.
-	// When decoded the key should be 16 bytes (AES-128) or 32 (AES-256).
-
-	// plaintext := []byte("exampleplaintext")
-	// plaintext := []byte(msg)
-
-	// nonce, _ := hex.DecodeString("64a9433eae7ccceee2fc0eda")
-
 	ciphertext := c.aesgcm.Seal(nil, c.nonce, plaintext, nil)
-	fmt.Printf("%x\n", ciphertext)
+	fmt.Printf("ciphertest=%x\n", ciphertext)
 	return ciphertext, nil
 }
 
@@ -85,22 +75,21 @@ func (c *Cipher) encryptFile(inpath string) (string, error) {
 		if size < 1024 && 0 < size {
 			buf1 := make([]byte, size)
 			buf = make([]byte, 1024)
-			n, err = infile.Read(buf1)
+			infile.Read(buf1)
 			copy(buf, buf1)
-			fmt.Println(size)
+			// fmt.Println(size)
+			n, err = infile.Read(make([]byte, 1))
 		} else {
 			n, err = infile.Read(buf)
 		}
 		size = size - int64(n)
 		if n > 0 {
-			//stream.XORKeyStream(buf, buf[:n])
 			ciphertext := c.aesgcm.Seal(nil, c.nonce, buf, nil)
 			// Write into file
 			outfile.Write(ciphertext)
 		}
 
 		if err == io.EOF {
-			fmt.Println("EOF")
 			ciphertext := c.aesgcm.Seal(nil, c.nonce, buf, nil)
 			outfile.Write(ciphertext)
 			break
@@ -113,6 +102,9 @@ func (c *Cipher) encryptFile(inpath string) (string, error) {
 	}
 	// Append the IV
 	outfile.Write(c.nonce)
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, uint64(size))
+	outfile.Write(b)
 	return outfile.Name(), nil
 }
 
@@ -131,8 +123,16 @@ func (c *Cipher) decryptFile(inpath string) (string, error) {
 	}
 
 	iv := make([]byte, 12)
-	msgLen := fi.Size() - int64(len(iv))
+	msgLen := fi.Size() - int64(len(iv)) - 8
 	_, err = infile.ReadAt(iv, msgLen)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sizeOfLastBytes := make([]byte, 8)
+	_, err = infile.ReadAt(sizeOfLastBytes, msgLen+12)
+	sizeOfLast := int64(binary.LittleEndian.Uint64(sizeOfLastBytes))
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -150,17 +150,19 @@ func (c *Cipher) decryptFile(inpath string) (string, error) {
 		n, err := infile.Read(buf)
 		if n > 0 {
 			// The last bytes are the IV, don't belong the original message
-			if n > int(msgLen) {
-				n = int(msgLen)
-			}
 			msgLen -= int64(n)
 			// stream.XORKeyStream(buf, buf[:n])
 			plaintext, _ := c.aesgcm.Open(nil, c.nonce, buf, nil)
 			// Write into file
-			outfile.Write(plaintext)
+			// fmt.Printf("plaintext=%v msgLen=%d\n", string(plaintext), msgLen)
+			if msgLen > 0 {
+				outfile.Write(plaintext)
+			} else {
+				outfile.Write(plaintext[0:sizeOfLast])
+			}
 		}
 
-		if err == io.EOF {
+		if err == io.EOF || msgLen == 0 {
 			break
 		}
 
@@ -198,6 +200,6 @@ func (c *Cipher) decrypt(ciphertext []byte) ([]byte, error) {
 		panic(err.Error())
 	}
 
-	fmt.Printf("%s\n", plaintext)
+	// fmt.Printf("%s\n", plaintext)
 	return plaintext, nil
 }

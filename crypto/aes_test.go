@@ -32,7 +32,7 @@ func TestAesGcmFileList(t *testing.T) {
 func testAesGcmFile(t *testing.T, inpath string) {
 	c, _ := newCipher()
 	// inpath := "plaintext.txt"
-	os.Remove(inpath + ".bin")
+	os.Remove(inpath + ".mn1")
 	os.Remove(inpath + ".out")
 	outpath, _ := c.encryptFile(inpath)
 	plainpath, _ := c.decryptFile(outpath)

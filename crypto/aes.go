@@ -52,6 +52,9 @@ func (c *Cipher) encrypt(plaintext []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
+const BUF_SIZE = 32 * 1024
+const CIPHER_SIZE = BUF_SIZE + 16
+
 func (c *Cipher) encryptFile(inpath string) (string, error) {
 	infile, err := os.Open(inpath)
 	if err != nil {
@@ -62,19 +65,19 @@ func (c *Cipher) encryptFile(inpath string) (string, error) {
 	size := fi.Size()
 	// Never use more than 2^32 random nonces with a given key
 	// because of the risk of repeat.
-	outfile, err := os.OpenFile(inpath+".bin", os.O_RDWR|os.O_CREATE, 0777)
+	outfile, err := os.OpenFile(inpath+".mn1", os.O_RDWR|os.O_CREATE, 0777)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer outfile.Close()
 	// The buffer size must be multiple of 16 bytes
-	buf := make([]byte, 1024)
+	buf := make([]byte, BUF_SIZE)
 	for {
 		n := -1
 		var err error
-		if size < 1024 && 0 < size {
+		if size < BUF_SIZE && 0 < size {
 			buf1 := make([]byte, size)
-			buf = make([]byte, 1024)
+			buf = make([]byte, BUF_SIZE)
 			infile.Read(buf1)
 			copy(buf, buf1)
 			// fmt.Println(size)
@@ -145,7 +148,7 @@ func (c *Cipher) decryptFile(inpath string) (string, error) {
 	defer outfile.Close()
 
 	// The buffer size must be multiple of 16 bytes
-	buf := make([]byte, 1040)
+	buf := make([]byte, CIPHER_SIZE)
 	for {
 		n, err := infile.Read(buf)
 		if n > 0 {

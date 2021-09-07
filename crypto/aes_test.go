@@ -37,7 +37,7 @@ func testAesGcmFile(t *testing.T, inpath string) {
 	outpath, _ := c.EncryptFile(inpath, "")
 	plainpath, _ := c.DecryptFile(outpath, "")
 	// fmt.Println(plainpath)
-	expected, _ := sha256File(inpath)
-	result, _ := sha256File(plainpath)
+	expected, _ := Sha256File(inpath)
+	result, _ := Sha256File(plainpath)
 	assert.Equal(t, expected, result)
 }

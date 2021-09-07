@@ -14,6 +14,6 @@ func TestSha256FileList(t *testing.T) {
 }
 
 func testSha256File(t *testing.T, path string, expected string) {
-	result, _ := sha256File(path)
+	result, _ := Sha256File(path)
 	assert.Equal(t, hex.EncodeToString(result), expected)
 }

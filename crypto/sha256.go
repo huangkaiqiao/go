@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func sha256File(path string) ([]byte, error) {
+func Sha256File(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)

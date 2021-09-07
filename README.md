@@ -2,7 +2,10 @@
 golang crypto library
 
 ## Install(安装)
+### crypto
 go get github.com/huangkaiqiao/go/crypto
+### mnemonic
+go get github.com/huangkaiqiao/go/mnemonic
 
 ## Test(测试)
 ```bash
@@ -42,6 +45,26 @@ func main() {
 	expected, _ := Sha256File(inpath)
 	result, _ := Sha256File(plainpath)
 	assert.Equal(t, expected, result)
+}
+```
+
+
+```go
+package main
+
+import (
+  "github.com/huangkaiqiao/go/mnemonic"
+  "fmt"
+)
+
+func main() {
+	// 获取助记词
+  mnemonic := mnemonic.NewMnemonic()
+  fmt.Println(mnemonic)
+
+  // 生成 filecoin 地址
+  address := mnemonic.FromMnemonic(mnemonic)
+  fmt.Println(address)
 }
 ```
 

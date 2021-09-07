@@ -17,25 +17,25 @@ func TestAesGcmList(t *testing.T) {
 
 func testAesGcm(t *testing.T, msg string) {
 	plaintext := []byte(msg)
-	c, _ := newCipher()
-	ciphertext, _ := c.encrypt(plaintext)
-	decrypttext, _ := c.decrypt(ciphertext)
+	c, _ := NewCipher(nil, nil)
+	ciphertext, _ := c.Encrypt(plaintext)
+	decrypttext, _ := c.Decrypt(ciphertext)
 	assert.Equal(t, plaintext, decrypttext)
 }
 
 func TestAesGcmFileList(t *testing.T) {
 	testAesGcmFile(t, "plaintext.txt")
-	testAesGcmFile(t, "gradle-7.2-bin.zip")
+	// testAesGcmFile(t, "gradle-7.2-bin.zip"
 	// testAesGcmFile(t, "android-studio-2020.3.1.23-linux.tar.gz")
 }
 
 func testAesGcmFile(t *testing.T, inpath string) {
-	c, _ := newCipher()
+	c, _ := NewCipher(RandomKey(), nil)
 	// inpath := "plaintext.txt"
 	os.Remove(inpath + ".mn1")
 	os.Remove(inpath + ".out")
-	outpath, _ := c.encryptFile(inpath)
-	plainpath, _ := c.decryptFile(outpath)
+	outpath, _ := c.EncryptFile(inpath, "")
+	plainpath, _ := c.DecryptFile(outpath, "")
 	// fmt.Println(plainpath)
 	expected, _ := sha256File(inpath)
 	result, _ := sha256File(plainpath)

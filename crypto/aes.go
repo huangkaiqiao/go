@@ -1,3 +1,5 @@
+// 用于文档加密的包
+
 package crypto
 
 import (
@@ -14,39 +16,51 @@ import (
 	// "math/rand"
 )
 
+// 加密文件的结构体,由密钥, aesgcm 对象, nonce 组成
 type Cipher struct {
 	key    []byte
 	aesgcm cipher.AEAD
 	nonce  []byte
 }
 
-func randomKey() []byte {
+// 生成随机 key 值
+func RandomKey() []byte {
 	key := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		panic(err.Error())
+	}
 	return key
 }
 
-func newCipher() (Cipher, error) {
+// 通过 key 和 nonce 生成 Cipher 对象, 传 nil 返回随机值
+func NewCipher(key []byte, nonce []byte) (Cipher, error) {
 	// key, _ := hex.DecodeString("6368616e676520746869732070617373776f726420746f206120736563726574")
-	key := randomKey()
+	if key == nil {
+		key = RandomKey()
+	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		panic(err.Error())
 	}
 
 	// Never use more than 2^32 random nonces with a given key because of the risk of a repeat.
-	nonce := make([]byte, 12)
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		panic(err.Error())
+	if nonce == nil {
+		nonce = make([]byte, 12)
+		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+			panic(err.Error())
+		}
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		panic(err.Error())
 	}
+	fmt.Printf("nonce:%d, size:%d", len(nonce), aesgcm.NonceSize())
 	return Cipher{key, aesgcm, nonce}, nil
 }
 
-func (c *Cipher) encrypt(plaintext []byte) ([]byte, error) {
+// 加密字节数组
+func (c *Cipher) Encrypt(plaintext []byte) ([]byte, error) {
 	ciphertext := c.aesgcm.Seal(nil, c.nonce, plaintext, nil)
 	fmt.Printf("ciphertest=%x\n", ciphertext)
 	return ciphertext, nil
@@ -55,7 +69,8 @@ func (c *Cipher) encrypt(plaintext []byte) ([]byte, error) {
 const BUF_SIZE = 32 * 1024
 const CIPHER_SIZE = BUF_SIZE + 16
 
-func (c *Cipher) encryptFile(inpath string) (string, error) {
+// 加密文件, inpath 输入文件的路径, outpath 加密文件的路径(可以传空字符串), 默认返回 inpath + ".mn1" 结尾的路径
+func (c *Cipher) EncryptFile(inpath string, outpath string) (string, error) {
 	infile, err := os.Open(inpath)
 	if err != nil {
 		log.Fatal(err)
@@ -65,7 +80,10 @@ func (c *Cipher) encryptFile(inpath string) (string, error) {
 	size := fi.Size()
 	// Never use more than 2^32 random nonces with a given key
 	// because of the risk of repeat.
-	outfile, err := os.OpenFile(inpath+".mn1", os.O_RDWR|os.O_CREATE, 0777)
+	if outpath == "" {
+		outpath = inpath + ".mn1"
+	}
+	outfile, err := os.OpenFile(outpath, os.O_RDWR|os.O_CREATE, 0777)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -111,7 +129,20 @@ func (c *Cipher) encryptFile(inpath string) (string, error) {
 	return outfile.Name(), nil
 }
 
-func (c *Cipher) decryptFile(inpath string) (string, error) {
+// 获取加密后的文件的 nonce
+func nonceOfFile(infile *os.File) ([]byte, error) {
+	iv := make([]byte, 12)
+	fi, err := infile.Stat()
+	msgLen := fi.Size() - int64(len(iv)) - 8
+	_, err = infile.ReadAt(iv, msgLen)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return iv, nil
+}
+
+// 解密文件, inpath 加密文件路径, outpath 输出文件路径(可选), 默认返回 inpath + ".out"
+func (c *Cipher) DecryptFile(inpath string, outpath string) (string, error) {
 	infile, err := os.Open(inpath)
 	if err != nil {
 		log.Fatal(err)
@@ -125,12 +156,19 @@ func (c *Cipher) decryptFile(inpath string) (string, error) {
 		log.Fatal(err)
 	}
 
-	iv := make([]byte, 12)
-	msgLen := fi.Size() - int64(len(iv)) - 8
-	_, err = infile.ReadAt(iv, msgLen)
+	// iv := make([]byte, 12)
+	// msgLen := fi.Size() - int64(len(iv)) - 8
+	// _, err = infile.ReadAt(iv, msgLen)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	iv, err := nonceOfFile(infile)
 	if err != nil {
 		log.Fatal(err)
 	}
+	c.nonce = iv // 更新了 cipher 的 nonce
+	msgLen := fi.Size() - int64(len(iv)) - 8
 
 	sizeOfLastBytes := make([]byte, 8)
 	_, err = infile.ReadAt(sizeOfLastBytes, msgLen+12)
@@ -140,7 +178,9 @@ func (c *Cipher) decryptFile(inpath string) (string, error) {
 		log.Fatal(err)
 	}
 
-	outpath := strings.TrimSuffix(inpath, filepath.Ext(inpath)) + ".out"
+	if outpath == "" {
+		outpath = strings.TrimSuffix(inpath, filepath.Ext(inpath)) + ".out"
+	}
 	outfile, err := os.OpenFile(outpath, os.O_RDWR|os.O_CREATE, 0777)
 	if err != nil {
 		log.Fatal(err)
@@ -177,7 +217,8 @@ func (c *Cipher) decryptFile(inpath string) (string, error) {
 	return outpath, nil
 }
 
-func (c *Cipher) decrypt(ciphertext []byte) ([]byte, error) {
+// 解密字节数组
+func (c *Cipher) Decrypt(ciphertext []byte) ([]byte, error) {
 
 	// Load your secret key from a safe place and reuse it across multiple
 	// Seal/Open calls. (Obviously don't use this example key for anything

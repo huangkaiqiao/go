@@ -1,4 +1,4 @@
-module github.com/huangkaiqiao/go-crypto
+module github.com/huangkaiqiao/go
 
 go 1.17
 
